@@ -122,8 +122,16 @@ public enum AppBundleIdentity {
 #else
         // Linux exposes the running image as a symlink at /proc/self/exe, which is
         // the closest equivalent to _NSGetExecutablePath and needs no buffer dance.
+        //
+        // A deleted or replaced binary does not make this fail, it makes it lie:
+        // readlink then answers "/path/to/binary (deleted)", which is non-empty and
+        // would sail past an emptiness check as a valid path. Requiring the path to
+        // exist is what separates a real answer from that one, and an absent identity
+        // is safer here than a confident wrong one -- identityMatches uses this to
+        // detect a stale helper.
         let resolved = try? FileManager.default.destinationOfSymbolicLink(atPath: "/proc/self/exe")
-        guard let path = resolved, !path.isEmpty else { return nil }
+        guard let path = resolved, !path.isEmpty,
+              FileManager.default.fileExists(atPath: path) else { return nil }
         return URL(fileURLWithPath: path)
 #endif
     }
