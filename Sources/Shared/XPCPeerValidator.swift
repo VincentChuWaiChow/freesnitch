@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 import Security
 
@@ -131,3 +132,4 @@ public enum XPCPeerValidator {
         return .success((team?.isEmpty ?? true) ? nil : team)
     }()
 }
+#endif

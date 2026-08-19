@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 /// Implemented by the GUI app; called by the system extension when a flow needs
@@ -251,3 +252,4 @@ extension IPCConnection: ProviderCommunication {
         completionHandler(Self.encodeStatus(status))
     }
 }
+#endif

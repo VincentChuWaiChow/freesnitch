@@ -52,11 +52,16 @@ public enum AppPreferences {
 
     private static func postChange(key: String, value: Any, notify: Bool) {
         guard notify else { return }
+        // Cross-process preference notification: the running GUI adopts a change made by CLI.
+        // DistributedNotificationCenter is absent from swift-corelibs-foundation, and there
+        // is no GUI off-macOS to notify.
+        #if os(macOS)
         DistributedNotificationCenter.default().postNotificationName(
             Notification.Name(changeNotification),
             object: nil,
             userInfo: [key: value],
             deliverImmediately: true
         )
+        #endif
     }
 }
