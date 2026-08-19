@@ -187,6 +187,19 @@ fileprivate struct PreparedIPPattern: Sendable {
     }
 }
 
+/// A rule path matches a process path only at a path-component boundary.
+///
+/// Bare hasPrefix() lets a rule for /usr/bin/foo authorise /usr/bin/foobar,
+/// silently widening an allow rule to a binary the user never approved. The
+/// prefix form is still needed because a rule may legitimately scope a whole
+/// directory, so the boundary is what separates the two cases rather than
+/// dropping prefix matching entirely.
+internal func freeSnitchProcessPathMatches(rule rulePath: String, process processPath: String) -> Bool {
+    if processPath == rulePath { return true }
+    let boundary = rulePath.hasSuffix("/") ? rulePath : rulePath + "/"
+    return processPath.hasPrefix(boundary)
+}
+
 fileprivate struct PreparedRule: Sendable {
     let action: RuleAction
     let expiresAt: Date?
@@ -214,7 +227,7 @@ fileprivate struct PreparedRule: Sendable {
     func matches(connection: Connection, address: PreparedConnectionAddress) -> Bool {
         if let direction, direction != connection.direction { return false }
         if let processBundleId, (connection.processBundleId ?? "") != processBundleId { return false }
-        if let processPath, !connection.processPath.hasPrefix(processPath) { return false }
+        if let processPath, !freeSnitchProcessPathMatches(rule: processPath, process: connection.processPath) { return false }
         if let remotePort, connection.remotePort != remotePort { return false }
         if let remoteHost, !remoteHost.matches(connection.remoteHost) { return false }
         if let remoteIP, !remoteIP.matches(rawIP: connection.remoteIP, parsed: address) { return false }
@@ -292,7 +305,7 @@ public struct RuleMatcher: Sendable {
             if (c.processBundleId ?? "") != bid { return false }
         }
         if let path = r.processPath, !path.isEmpty {
-            if c.processPath != path && !c.processPath.hasPrefix(path) { return false }
+            if !freeSnitchProcessPathMatches(rule: path, process: c.processPath) { return false }
         }
         if let port = r.remotePort, port != 0 {
             if c.remotePort != port { return false }
