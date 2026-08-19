@@ -225,8 +225,6 @@ else
         'AppPreferences.swift'
         'HelperProtocol.swift'
         'IPCConnection.swift'
-        'IPGeo.swift'
-        'Logger.swift'
         'RuleStore.swift'
         'XPCPeerValidator.swift'
         'ProfileCommand.swift'
@@ -257,6 +255,7 @@ else
         --user "$(id -u):$(id -g)" \
         -e HOME=/tmp \
         -v "$WORK":/w \
+        -v "$ROOT/Sources/CZlib":/czlib:ro \
         "${FREESNITCH_SWIFT_IMAGE:-swift:6.0-noble}" \
-        bash -c "cd /w && swiftc -O -o harness main.swift $(printf '%s ' "${SHARED[@]}") 2>&1 && ./harness" | grep -v 'warning:'
+        bash -c "cd /w && swiftc -O -o harness -Xcc -fmodule-map-file=/czlib/module.modulemap main.swift $(printf '%s ' "${SHARED[@]}") -lz 2>&1 && ./harness" | grep -v 'warning:'
 fi

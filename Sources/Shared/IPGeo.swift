@@ -1,5 +1,12 @@
 import Foundation
-import Compression
+#if canImport(FoundationNetworking)
+import FoundationNetworking
+#endif
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 /// Offline IP geolocation.
 ///
@@ -862,9 +869,7 @@ final class GeoLineReader {
     private let descriptor: Int32
     private let maxOutputBytes: Int
     private let isCompressed: Bool
-    private var stream = compression_stream(dst_ptr: UnsafeMutablePointer<UInt8>(bitPattern: -1)!, dst_size: 0,
-                                            src_ptr: UnsafePointer<UInt8>(bitPattern: -1)!, src_size: 0, state: nil)
-    private var streamInitialized = false
+    private let decoder = DeflateDecoder()
     private let input: UnsafeMutablePointer<UInt8>
     private let output: UnsafeMutablePointer<UInt8>
     private var inputCount = 0
@@ -884,29 +889,36 @@ final class GeoLineReader {
         input = .allocate(capacity: Self.inputChunk)
         output = .allocate(capacity: Self.outputChunk)
 
-        let read = Darwin.read(descriptor, input, Self.inputChunk)
-        guard read >= 2 else {
+        let readCount = read(descriptor, input, Self.inputChunk)
+        guard readCount >= 2 else {
             input.deallocate()
             output.deallocate()
             close(descriptor)
             throw IPGeoCache.GeoError("the database file is empty")
         }
-        inputCount = read
+        inputCount = readCount
 
         guard input[0] == 0x1f, input[1] == 0x8b else {
             isCompressed = false
             return
         }
-        // Apple's COMPRESSION_ZLIB is raw DEFLATE, so the gzip wrapper is
-        // stripped here and the deflate payload is streamed straight in.
+        // The input is gzip (RFC 1952). The DEFLATE decoder expects raw DEFLATE
+        // (RFC 1951), so the gzip wrapper is stripped here and the raw deflate
+        // payload is streamed straight to the decoder.
         var failure: String?
         var offset = 0
         switch Self.gzipHeaderLength(input, inputCount) {
         case .success(let length): offset = length
         case .failure(let error): failure = error.message
         }
-        if failure == nil, compression_stream_init(&stream, COMPRESSION_STREAM_DECODE, COMPRESSION_ZLIB) != COMPRESSION_STATUS_OK {
-            failure = "cannot start the gzip decoder"
+        if failure == nil {
+            do {
+                try decoder.initialize()
+            } catch let error as IPGeoCache.GeoError {
+                failure = error.message
+            } catch {
+                failure = "cannot start the DEFLATE decoder"
+            }
         }
         if let failure {
             input.deallocate()
@@ -914,7 +926,6 @@ final class GeoLineReader {
             close(descriptor)
             throw IPGeoCache.GeoError(failure)
         }
-        streamInitialized = true
         isCompressed = true
         inputOffset = offset
     }
@@ -941,7 +952,6 @@ final class GeoLineReader {
     }
 
     deinit {
-        if streamInitialized { compression_stream_destroy(&stream) }
         input.deallocate()
         output.deallocate()
         close(descriptor)
@@ -970,8 +980,8 @@ final class GeoLineReader {
     /// Refills the input buffer. False means end of file.
     private func fill() -> Bool {
         inputOffset = 0
-        let read = Darwin.read(descriptor, input, Self.inputChunk)
-        inputCount = read > 0 ? read : 0
+        let readCount = read(descriptor, input, Self.inputChunk)
+        inputCount = readCount > 0 ? readCount : 0
         return inputCount > 0
     }
 
@@ -985,15 +995,20 @@ final class GeoLineReader {
                 inputCount = 0
                 inputOffset = 0
             }
-            stream.src_ptr = UnsafePointer(input + inputOffset)
-            stream.src_size = inputCount - inputOffset
-            var status = COMPRESSION_STATUS_OK
+            var inputAvailable = inputCount - inputOffset
+            var status = DecoderStatus.ok
             var producedInPass = 0
+            var outputAvailable: Int
             repeat {
-                stream.dst_ptr = output
-                stream.dst_size = Self.outputChunk
-                status = compression_stream_process(&stream, reachedInputEnd ? Int32(COMPRESSION_STREAM_FINALIZE.rawValue) : 0)
-                let produced = Self.outputChunk - stream.dst_size
+                outputAvailable = Self.outputChunk
+                status = decoder.process(
+                    inputPtr: input + inputOffset,
+                    inputSize: &inputAvailable,
+                    outputPtr: output,
+                    outputSize: &outputAvailable,
+                    finalize: reachedInputEnd
+                )
+                let produced = Self.outputChunk - outputAvailable
                 if produced > 0 {
                     producedInPass += produced
                     outputBytes += produced
@@ -1002,18 +1017,18 @@ final class GeoLineReader {
                     }
                     try emit(UnsafeBufferPointer(start: output, count: produced), body)
                 }
-                if status != COMPRESSION_STATUS_OK { break }
+                if status != .ok { break }
                 // After the last input byte the decoder still has to be drained:
-                // it keeps answering OK until the final flush completes.
-            } while stream.src_size > 0 || stream.dst_size == 0 || reachedInputEnd
-            inputOffset = inputCount - stream.src_size
+                // it keeps answering .ok until the final flush completes.
+            } while inputAvailable > 0 || outputAvailable == 0 || reachedInputEnd
+            inputOffset = inputCount - inputAvailable
 
             switch status {
-            case COMPRESSION_STATUS_ERROR:
+            case .error:
                 throw IPGeoCache.GeoError("the compressed database is corrupt")
-            case COMPRESSION_STATUS_END:
+            case .end:
                 finished = true
-            default:
+            case .ok:
                 if reachedInputEnd, producedInPass == 0 {
                     throw IPGeoCache.GeoError("the compressed database ends before the stream does")
                 }

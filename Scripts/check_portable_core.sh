@@ -45,7 +45,6 @@ TOOLCHAIN="$(select_toolchain)"
 # Update this list as Phase 1 and 2 land. Never grow without a design decision.
 # When a file in this list compiles clean, it's progress — report but don't fail.
 EXPECTED_BLOCKERS=(
-    'IPGeo.swift'
     'RuleStore.swift'
 )
 
@@ -55,6 +54,10 @@ EXPECTED_BLOCKERS=(
 # it finds type errors, which is the normal case here. That makes a compiler
 # that never ran indistinguishable from a clean compile, so the toolchain is
 # proven separately by preflight_toolchain() before the sweep starts.
+#
+# On non-Darwin, the CZlib module map must be provided so that the C module
+# can be found. The module map is part of Sources/CZlib and points to the
+# system zlib headers. For typecheck mode, we don't link, just map the module.
 compile() {
     local files_arg=("$@")
 
@@ -63,10 +66,11 @@ compile() {
             --user "$(id -u):$(id -g)" \
             -e HOME=/tmp \
             -v "$WORK":/w \
+            -v "$ROOT/Sources/CZlib":/czlib:ro \
             "${FREESNITCH_SWIFT_IMAGE:-swift:6.0-noble}" \
-            bash -c "swiftc -typecheck /w/*.swift 2>&1" || true
+            bash -c "swiftc -typecheck -Xcc -fmodule-map-file=/czlib/module.modulemap /w/*.swift 2>&1" || true
     else
-        swiftc -typecheck "${files_arg[@]}" 2>&1 || true
+        swiftc -typecheck -Xcc -fmodule-map-file="$ROOT/Sources/CZlib/module.modulemap" "${files_arg[@]}" 2>&1 || true
     fi
 }
 
