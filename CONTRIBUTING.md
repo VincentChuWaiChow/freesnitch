@@ -16,6 +16,33 @@ The default `xcodegen generate` command uses `project.yml`, the contributor buil
 
 Build target: FreeSnitch. Hit ⌘R. A local contributor build may fail to install the helper daemon without Developer ID signing. That is expected for an unsigned development build. The GUI still launches against in-memory state, and per-process filtering is absent because the extension is not embedded.
 
+## Building on Linux
+
+The Xcode/XcodeGen build is macOS-only and remains the build of record for shipping. Linux builds cover the portable core and CLI only; the GUI, the pf enforcement backend, and the Network Extension are macOS-only by construction.
+
+Check that the portable core compiles without Apple frameworks:
+
+```bash
+bash Scripts/check_portable_core.sh
+```
+
+This script runs in Docker by default (or uses a native non-Darwin `swiftc` if available). Docker is the default because it needs no host setup. The script must NOT be run with a macOS `swiftc`, since that toolchain targets Apple platforms and would report everything as portable.
+
+Once `Package.swift` is added (planned work, not yet available), you will be able to build with Swift Package Manager:
+
+```bash
+docker run --rm \
+  --user "$(id -u):$(id -g)" \
+  -v "$PWD:/work" -w /work \
+  -v "$PWD/.build:/work/.build" \
+  swift:6.0-noble \
+  swift build
+```
+
+Without `--user "$(id -u):$(id -g)"`, the container builds as root and leaves root-owned artefacts that you cannot delete without `sudo`. The `.build` mount caches compiled modules between runs. A native toolchain from swift.org works equally well.
+
+Note: the repo pins `SWIFT_VERSION: "5.10"` in `project.yml` while the container ships Swift 6.0.3. This is a known open question, not a settled decision.
+
 ## Conventions
 
 - **Swift 5.10**, macOS 13+ deployment target.
