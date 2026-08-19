@@ -46,9 +46,7 @@ TOOLCHAIN="$(select_toolchain)"
 # When a file in this list compiles clean, it's progress — report but don't fail.
 EXPECTED_BLOCKERS=(
     'AppBundleIdentity.swift'
-    'HelperProtocol.swift'
     'IPGeo.swift'
-    'Logger.swift'
     'RuleStore.swift'
 )
 

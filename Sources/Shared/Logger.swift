@@ -1,15 +1,59 @@
 import Foundation
+
+#if canImport(os)
 import os.log
+#endif
 
 public enum PSLog {
-    public static let app = OSLog(subsystem: AppConstants.bundleIdGUI, category: "app")
-    public static let helper = OSLog(subsystem: AppConstants.bundleIdGUI, category: "helper")
-    public static let dns = OSLog(subsystem: AppConstants.bundleIdGUI, category: "dns")
-    public static let pf = OSLog(subsystem: AppConstants.bundleIdGUI, category: "pf")
-    public static let netmon = OSLog(subsystem: AppConstants.bundleIdGUI, category: "netmon")
-    public static let netext = OSLog(subsystem: AppConstants.bundleIdGUI, category: "netext")
+#if canImport(os)
+    public typealias Category = OSLog
 
-    public static func info(_ log: OSLog, _ msg: String) { os_log("%{public}@", log: log, type: .info, msg) }
-    public static func error(_ log: OSLog, _ msg: String) { os_log("%{public}@", log: log, type: .error, msg) }
-    public static func debug(_ log: OSLog, _ msg: String) { os_log("%{public}@", log: log, type: .debug, msg) }
+    private static func make(_ name: String) -> Category {
+        OSLog(subsystem: AppConstants.bundleIdGUI, category: name)
+    }
+#else
+    /// os.log has no counterpart in swift-corelibs-foundation, so off-Apple the
+    /// category is just its name and the backend writes to stderr. Keeping the
+    /// type behind PSLog means the 84 call sites never learn which backend ran.
+    public struct Category: Sendable {
+        public let name: String
+    }
+
+    private static func make(_ name: String) -> Category {
+        Category(name: name)
+    }
+#endif
+
+    public static let app = make("app")
+    public static let helper = make("helper")
+    public static let dns = make("dns")
+    public static let pf = make("pf")
+    public static let netmon = make("netmon")
+    public static let netext = make("netext")
+
+#if canImport(os)
+    public static func info(_ log: Category, _ msg: String) {
+        os_log("%{public}@", log: log, type: .info, msg)
+    }
+
+    public static func error(_ log: Category, _ msg: String) {
+        os_log("%{public}@", log: log, type: .error, msg)
+    }
+
+    public static func debug(_ log: Category, _ msg: String) {
+        os_log("%{public}@", log: log, type: .debug, msg)
+    }
+#else
+    public static func info(_ log: Category, _ msg: String) {
+        fputs("[\(log.name)] [info] \(msg)\n", stderr)
+    }
+
+    public static func error(_ log: Category, _ msg: String) {
+        fputs("[\(log.name)] [error] \(msg)\n", stderr)
+    }
+
+    public static func debug(_ log: Category, _ msg: String) {
+        fputs("[\(log.name)] [debug] \(msg)\n", stderr)
+    }
+#endif
 }

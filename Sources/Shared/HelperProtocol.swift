@@ -1,5 +1,13 @@
 import Foundation
 
+// MARK: - macOS-only: Objective-C interoperability
+// The protocols below are @objc because NSXPC requires Objective-C runtime integration.
+// Objective-C interoperability is disabled off-Apple platforms (Linux, Windows, etc.),
+// making these declarations unable to compile there. The portable IPC transport will
+// need its own method enumeration rather than reusing these @objc protocols.
+
+#if os(macOS)
+
 @objc public protocol HelperProtocol {
     /// The build of the running helper process, not the build on disk.
     func getVersion(reply: @escaping (String) -> Void)
@@ -111,3 +119,5 @@ public enum HelperBridge {
         return iface
     }
 }
+
+#endif
