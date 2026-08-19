@@ -1,5 +1,9 @@
-import Darwin
 import Foundation
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 
 /// Resolves the identity of the app that contains the running executable.
 ///
@@ -105,6 +109,7 @@ public enum AppBundleIdentity {
     }
 
     private static var currentExecutableURL: URL? {
+#if canImport(Darwin)
         var size: UInt32 = 0
         _ = _NSGetExecutablePath(nil, &size)
         guard size > 0 else { return nil }
@@ -114,5 +119,12 @@ public enum AppBundleIdentity {
         return String(cString: buffer).isEmpty
             ? nil
             : URL(fileURLWithPath: String(cString: buffer))
+#else
+        // Linux exposes the running image as a symlink at /proc/self/exe, which is
+        // the closest equivalent to _NSGetExecutablePath and needs no buffer dance.
+        let resolved = try? FileManager.default.destinationOfSymbolicLink(atPath: "/proc/self/exe")
+        guard let path = resolved, !path.isEmpty else { return nil }
+        return URL(fileURLWithPath: path)
+#endif
     }
 }

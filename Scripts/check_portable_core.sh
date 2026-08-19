@@ -45,7 +45,6 @@ TOOLCHAIN="$(select_toolchain)"
 # Update this list as Phase 1 and 2 land. Never grow without a design decision.
 # When a file in this list compiles clean, it's progress — report but don't fail.
 EXPECTED_BLOCKERS=(
-    'AppBundleIdentity.swift'
     'IPGeo.swift'
     'RuleStore.swift'
 )
