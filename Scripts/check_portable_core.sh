@@ -41,12 +41,38 @@ select_toolchain() {
 
 TOOLCHAIN="$(select_toolchain)"
 
+# Resolve or build the Docker image.
+# If FREESNITCH_SWIFT_IMAGE is set, use it as-is (e.g., for CI where the image
+# is pre-built). Otherwise, use a local tag and build on demand from the Dockerfile.
+resolve_swift_image() {
+    if [ -n "${FREESNITCH_SWIFT_IMAGE:-}" ]; then
+        printf '%s\n' "$FREESNITCH_SWIFT_IMAGE"
+        return 0
+    fi
+
+    local image_tag="freesnitch-swift-build:6.0-noble"
+
+    # Check if the image already exists locally.
+    if docker image inspect "$image_tag" >/dev/null 2>&1; then
+        printf '%s\n' "$image_tag"
+        return 0
+    fi
+
+    # Image does not exist; build it from the Dockerfile.
+    printf 'portable core check: building %s (this may take a minute on first run)...\n' "$image_tag" >&2
+    if ! docker build -t "$image_tag" -f "$ROOT/Scripts/swift-build.Dockerfile" "$ROOT" >/dev/null 2>&1; then
+        fail "failed to build Swift image: docker build -t $image_tag"
+    fi
+
+    printf '%s\n' "$image_tag"
+}
+
+SWIFT_IMAGE="$(resolve_swift_image)"
+
 # Hardcoded expected blockers, verified against Swift 6.0.3 on Linux.
 # Update this list as Phase 1 and 2 land. Never grow without a design decision.
 # When a file in this list compiles clean, it's progress — report but don't fail.
-EXPECTED_BLOCKERS=(
-    'RuleStore.swift'
-)
+EXPECTED_BLOCKERS=()
 
 # Compile with the selected toolchain. Output raw stderr/stdout.
 #
@@ -67,10 +93,11 @@ compile() {
             -e HOME=/tmp \
             -v "$WORK":/w \
             -v "$ROOT/Sources/CZlib":/czlib:ro \
-            "${FREESNITCH_SWIFT_IMAGE:-swift:6.0-noble}" \
-            bash -c "swiftc -typecheck -Xcc -fmodule-map-file=/czlib/module.modulemap /w/*.swift 2>&1" || true
+            -v "$ROOT/Sources/CSQLite3":/csqlite3:ro \
+            "$SWIFT_IMAGE" \
+            bash -c "swiftc -typecheck -Xcc -fmodule-map-file=/czlib/module.modulemap -Xcc -fmodule-map-file=/csqlite3/module.modulemap /w/*.swift 2>&1" || true
     else
-        swiftc -typecheck -Xcc -fmodule-map-file="$ROOT/Sources/CZlib/module.modulemap" "${files_arg[@]}" 2>&1 || true
+        swiftc -typecheck -Xcc -fmodule-map-file="$ROOT/Sources/CZlib/module.modulemap" -Xcc -fmodule-map-file="$ROOT/Sources/CSQLite3/module.modulemap" "${files_arg[@]}" 2>&1 || true
     fi
 }
 
@@ -94,7 +121,7 @@ preflight_toolchain() {
             --user "$(id -u):$(id -g)" \
             -e HOME=/tmp \
             -v "$probe":/p \
-            "${FREESNITCH_SWIFT_IMAGE:-swift:6.0-noble}" \
+            "$SWIFT_IMAGE" \
             bash -c "swiftc -typecheck /p/Preflight.swift" 2>&1)"; then
             status=1
         fi
@@ -109,7 +136,7 @@ preflight_toolchain() {
     if [ "$status" -ne 0 ]; then
         fail "toolchain cannot compile a trivial file, so its silence proves nothing.
   toolchain: $TOOLCHAIN
-  image:     ${FREESNITCH_SWIFT_IMAGE:-swift:6.0-noble}
+  image:     $SWIFT_IMAGE
   output:    $out"
     fi
 }

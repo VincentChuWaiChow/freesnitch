@@ -202,6 +202,33 @@ if failures > 0 {
 print("rule path scope verification: PASS")
 SWIFT
 
+# Resolve or build the Docker image (mirrors check_portable_core.sh).
+resolve_swift_image() {
+    if [ -n "${FREESNITCH_SWIFT_IMAGE:-}" ]; then
+        printf '%s\n' "$FREESNITCH_SWIFT_IMAGE"
+        return 0
+    fi
+
+    local image_tag="freesnitch-swift-build:6.0-noble"
+
+    # Check if the image already exists locally.
+    if docker image inspect "$image_tag" >/dev/null 2>&1; then
+        printf '%s\n' "$image_tag"
+        return 0
+    fi
+
+    # Image does not exist; build it from the Dockerfile.
+    printf 'rule path scope: building %s (this may take a minute on first run)...\n' "$image_tag" >&2
+    if ! docker build -t "$image_tag" -f "$ROOT/Scripts/swift-build.Dockerfile" "$ROOT" >/dev/null 2>&1; then
+        printf 'rule path scope: FAILED to build Swift image\n' >&2
+        exit 1
+    fi
+
+    printf '%s\n' "$image_tag"
+}
+
+SWIFT_IMAGE="$(resolve_swift_image)"
+
 # Determine platform and compile accordingly
 OS="$(uname -s)"
 
@@ -225,10 +252,7 @@ else
         'AppPreferences.swift'
         'HelperProtocol.swift'
         'IPCConnection.swift'
-        'RuleStore.swift'
         'XPCPeerValidator.swift'
-        'ProfileCommand.swift'
-        'ProfileCoordinator.swift'
     )
 
     SHARED=()
@@ -256,6 +280,7 @@ else
         -e HOME=/tmp \
         -v "$WORK":/w \
         -v "$ROOT/Sources/CZlib":/czlib:ro \
-        "${FREESNITCH_SWIFT_IMAGE:-swift:6.0-noble}" \
-        bash -c "cd /w && swiftc -O -o harness -Xcc -fmodule-map-file=/czlib/module.modulemap main.swift $(printf '%s ' "${SHARED[@]}") -lz 2>&1 && ./harness" | grep -v 'warning:'
+        -v "$ROOT/Sources/CSQLite3":/csqlite3:ro \
+        "$SWIFT_IMAGE" \
+        bash -c "cd /w && swiftc -O -o harness -Xcc -fmodule-map-file=/czlib/module.modulemap -Xcc -fmodule-map-file=/csqlite3/module.modulemap main.swift $(printf '%s ' "${SHARED[@]}") -lz -lsqlite3 2>&1 && ./harness" | grep -v 'warning:'
 fi
