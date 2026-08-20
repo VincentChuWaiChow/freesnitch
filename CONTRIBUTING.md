@@ -28,7 +28,7 @@ bash Scripts/check_portable_core.sh
 
 This script runs in Docker by default (or uses a native non-Darwin `swiftc` if available). Docker is the default because it needs no host setup. The script must NOT be run with a macOS `swiftc`, since that toolchain targets Apple platforms and would report everything as portable.
 
-Once `Package.swift` is added (planned work, not yet available), you will be able to build with Swift Package Manager:
+Build with Swift Package Manager:
 
 ```bash
 docker run --rm \
