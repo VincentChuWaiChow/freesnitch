@@ -387,8 +387,22 @@ public struct AppConstants {
     public static let ipcMachServiceName = "BHAF4L4726.io.isaaclins.freesnitch.ipc"
     public static let appGroup = "BHAF4L4726.io.isaaclins.freesnitch"
     public static let teamID = "BHAF4L4726"
-    public static let version: String =
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.2.0"
+    public static let version: String = {
+        if let v = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String {
+            return v
+        }
+        #if os(macOS)
+        return "0.2.0"
+        #else
+        return "unknown"
+        #endif
+    }()
+
+    /// The version from the Info dictionary, when available. Off-Apple platforms
+    /// (e.g., Linux) have no Info.plist, so this is nil instead of fabricated.
+    /// Use this to detect when the running identity is truly unknown.
+    public static let versionIfKnown: String? =
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String
 
     /// The build number, when the running code has an Info.plist to read it
     /// from. A bare command line tool has none, so this is optional rather
@@ -431,6 +445,12 @@ public struct AppConstants {
         }
         return false
     }
+
+    /// Whether identity comparisons can mean anything on this platform.
+    /// Off-Apple there is no Info.plist, so `version` is not a real build
+    /// identity and neither a match nor a mismatch can be claimed from it.
+    /// On Apple, identity checks are always meaningful.
+    public static var identityIsDeterminable: Bool { versionIfKnown != nil }
 
     private static func marketingVersion(of identity: String) -> String {
         identity.split(separator: " ").first.map(String.init) ?? identity
