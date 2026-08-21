@@ -91,3 +91,6 @@ jobs:
 
       - name: Test CLI platform gating and exit codes
         run: bash Scripts/test_cli_platform_gating.sh
+
+      - name: Test Unix socket server binding and peer authentication
+        run: bash Scripts/test_unix_socket_server.sh
