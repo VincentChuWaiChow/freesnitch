@@ -82,3 +82,6 @@ jobs:
 
       - name: Test Linux peer authentication via SO_PEERCRED
         run: bash Scripts/test_peer_authenticator.sh
+
+      - name: Test Unix socket transport correlation and timeouts
+        run: bash Scripts/test_unix_socket_transport.sh
