@@ -164,5 +164,5 @@ else
         -v "$ROOT/Sources/CZlib":/czlib:ro \
         -v "$ROOT/Sources/CSQLite3":/csqlite3:ro \
         "$SWIFT_IMAGE" \
-        bash -c "cd /w && swiftc -O -o harness -Xcc -fmodule-map-file=/czlib/module.modulemap -Xcc -fmodule-map-file=/csqlite3/module.modulemap main.swift $(printf '%s ' "${SHARED[@]}") -lz -lsqlite3 2>&1 && ./harness" | grep -v 'warning:' || true
+        bash -c "cd /w && swiftc -O -o harness -Xcc -fmodule-map-file=/czlib/module.modulemap -Xcc -fmodule-map-file=/csqlite3/module.modulemap main.swift $(printf '%s ' "${SHARED[@]}") -lz -lsqlite3 > /tmp/build.log 2>&1 || { grep -v 'warning:' /tmp/build.log >&2; exit 1; }; ./harness"
 fi

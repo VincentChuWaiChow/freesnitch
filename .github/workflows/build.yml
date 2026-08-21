@@ -85,3 +85,6 @@ jobs:
 
       - name: Test Unix socket transport correlation and timeouts
         run: bash Scripts/test_unix_socket_transport.sh
+
+      - name: Test platform environment paths
+        run: bash Scripts/test_platform_environment.sh
