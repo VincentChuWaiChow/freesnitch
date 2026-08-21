@@ -1,5 +1,4 @@
 import Foundation
-import Darwin
 
 @main
 struct FreeSnitchCLI {

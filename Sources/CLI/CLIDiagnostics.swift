@@ -60,6 +60,7 @@ enum ExtensionInspector {
     }
 }
 
+#if os(macOS)
 enum SystemExtensionProbe {
     static func read() -> SystemExtensionObservation {
         let executable = "/usr/bin/systemextensionsctl"
@@ -135,6 +136,7 @@ enum SystemExtensionProbe {
         return SystemExtensionObservation(state: "unknown", detail: "The FreeSnitch network extension is listed, but macOS reported no active generation.")
     }
 }
+#endif
 
 enum FilterPreferencesProbe {
     static func read() async -> FilterObservation {
@@ -159,6 +161,7 @@ enum FilterPreferencesProbe {
     }
 }
 
+#if os(macOS)
 enum PFProbe {
     static let anchor = PFReport(anchor: PFManagerName.anchor,
                                  path: PFManagerName.path,
@@ -263,3 +266,4 @@ enum PFManagerName {
     static let anchor = "puresnitch"
     static let path = "/etc/pf.anchors/puresnitch"
 }
+#endif

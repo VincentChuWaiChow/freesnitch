@@ -11,7 +11,9 @@ final class CLIRunner {
     func run() async throws -> CommandResult {
         switch invocation.command {
         case .status: return try await status()
+        #if os(macOS)
         case .doctor: return await doctor()
+        #endif
         case .mode(let mode): return try await setMode(mode)
         case .rules(let command): return try await rules(command)
         case .monitor(let command): return try await monitor(command)
@@ -25,8 +27,10 @@ final class CLIRunner {
         case .blocklist(let id, let enabled): return try await setBlocklist(id: id, enabled: enabled)
         case .doh(let url): return try await setDoH(url)
         case .enforcement(let enabled): return try await setEnforcement(enabled)
+        #if os(macOS)
         case .pf(let operation): return try await pf(operation)
         case .flush: return try await flush()
+        #endif
         case .settings(let command): return try await settings(command)
         case .alerts(let command): return try await alerts(command)
         case .help, .version:
@@ -43,6 +47,7 @@ final class CLIRunner {
         return CommandResult(data: report, human: humanStatus(report))
     }
 
+    #if os(macOS)
     private func doctor() async -> CommandResult {
         let extensionInspection = await ExtensionInspector.inspect()
         let helper = CLIHelperClient()
@@ -81,6 +86,7 @@ final class CLIRunner {
                              exitCode: exitCode,
                              error: doctorError)
     }
+    #endif
 
     private func setMode(_ mode: AppMode) async throws -> CommandResult {
         let helper = CLIHelperClient()
@@ -458,6 +464,7 @@ final class CLIRunner {
                              human: "Enforcement: \(humanBool(enabled)).\nPF anchor: \(humanBool(status.pfctlActive)); DNS proxy: \(humanBool(status.dnsProxyActive)).")
     }
 
+    #if os(macOS)
     private func pf(_ operation: PFCommand) async throws -> CommandResult {
         if case .uninstall = operation { try requireYes("pf uninstall") }
         let helper = CLIHelperClient()
@@ -485,6 +492,7 @@ final class CLIRunner {
         let report = PFProbe.read(helperStatus: try? await helper.prepare())
         return CommandResult(data: report, human: "Firewall flush completed.\n\(humanPF(report))")
     }
+    #endif
 
     private func settings(_ command: SettingsCommand) async throws -> CommandResult {
         switch command {

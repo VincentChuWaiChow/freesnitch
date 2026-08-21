@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 enum CLIAppBundle {
@@ -22,3 +23,4 @@ enum CLIAppBundle {
             .contains { $0.pathExtension == "systemextension" } ?? false
     }
 }
+#endif

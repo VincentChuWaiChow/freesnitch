@@ -88,3 +88,6 @@ jobs:
 
       - name: Test platform environment paths
         run: bash Scripts/test_platform_environment.sh
+
+      - name: Test CLI platform gating and exit codes
+        run: bash Scripts/test_cli_platform_gating.sh

@@ -181,10 +181,13 @@ enum CLIParser {
         case "doh":
             command = .doh(try parseSingleValue(Array(arguments.dropFirst()), context: "doh"))
         case "enforcement":
+            try checkPlatformAvailability(for: "enforcement")
             command = .enforcement(try parseToggleCommand(Array(arguments.dropFirst()), context: "enforcement"))
         case "pf":
+            try checkPlatformAvailability(for: "pf")
             command = .pf(try parsePF(Array(arguments.dropFirst())))
         case "flush":
+            try checkPlatformAvailability(for: "flush")
             let cursor = TokenCursor(tokens: Array(arguments.dropFirst()))
             try cursor.requireEnd("flush")
             command = .flush
@@ -193,6 +196,7 @@ enum CLIParser {
         case "settings":
             command = .settings(try parseSettings(Array(arguments.dropFirst())))
         case "helper":
+            try checkPlatformAvailability(for: "settings helper")
             command = .settings(.helper(try parseHelperSettings(Array(arguments.dropFirst()))))
         default:
             throw CLIError(.invalidArgument,
@@ -531,9 +535,9 @@ enum CLIParser {
             throw CLIError(.invalidArgument, message: "settings requires a setting or action.", remediation: "Use helper, speeds, launch-at-login, alerts-all-spaces, enforcement, mode, doh, dns, blocklists, or blocklist.")
         }
         switch subcommand {
-        case "helper": return .helper(try parseHelperSettings(cursor.remaining()))
+        case "helper": try checkPlatformAvailability(for: "settings helper"); return .helper(try parseHelperSettings(cursor.remaining()))
         case "speeds", "show-speeds": return try parseBooleanSetting(cursor.remaining(), key: AppPreferences.Key.showSpeeds, label: "show speeds")
-        case "launch-at-login": return try parseBooleanSetting(cursor.remaining(), key: "launch-at-login", label: "launch at login")
+        case "launch-at-login": try checkPlatformAvailability(for: "settings launch-at-login"); return try parseBooleanSetting(cursor.remaining(), key: "launch-at-login", label: "launch at login")
         case "alerts-all-spaces": return try parseBooleanSetting(cursor.remaining(), key: AppPreferences.Key.alertsAllSpaces, label: "alerts on all Spaces")
         case "enforcement":
             if cursor.isAtEnd { return .enforcement(nil) }
@@ -582,6 +586,23 @@ enum CLIParser {
             throw CLIError(.invalidArgument, message: "invalid state `\(value)` for \(label).", remediation: "Use on or off.")
         }
         return .boolean(key: key, label: label, value: enabled)
+    }
+
+    private static func checkPlatformAvailability(for command: String) throws {
+        #if !os(macOS)
+        let platformName = {
+            #if os(Linux)
+            return "Linux"
+            #elseif os(Windows)
+            return "Windows"
+            #else
+            return "this platform"
+            #endif
+        }()
+        throw CLIError(.invalidArgument,
+                       message: "the `\(command)` command is not available on \(platformName).",
+                       remediation: "This command is macOS-only. Run `freesnitch --help` to see the available commands.")
+        #endif
     }
 
     private static func helpName(_ topic: [String]) -> String {

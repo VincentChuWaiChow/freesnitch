@@ -1,3 +1,4 @@
+#if os(macOS)
 import Foundation
 
 enum ExtensionClientError: Error {
@@ -100,3 +101,4 @@ final class CLIAppCommunication: NSObject, AppCommunication {
         responseHandler(true, false)
     }
 }
+#endif
