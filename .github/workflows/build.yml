@@ -62,7 +62,7 @@ jobs:
           echo 'Monitor bundle verified without profiles or restricted entitlements.'
 
   portable-core:
-    name: Portable core check
+    name: Portable core and Linux regression tests
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -70,3 +70,15 @@ jobs:
 
       - name: Verify the shared core compiles without Apple frameworks
         run: bash Scripts/check_portable_core.sh
+
+      - name: Test rule path scope security boundary
+        run: bash Scripts/test_rule_path_scope.sh
+
+      - name: Test IPC frame codec and oversize rejection
+        run: bash Scripts/test_helper_frame.sh
+
+      - name: Test version identity and non-fabrication
+        run: bash Scripts/test_version_identity.sh
+
+      - name: Test Linux peer authentication via SO_PEERCRED
+        run: bash Scripts/test_peer_authenticator.sh
